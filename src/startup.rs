@@ -14,17 +14,26 @@ use crate::data::fetch_products;
 
 pub fn run(mut settings: Settings) -> Result<Server, std::io::Error> {
     
-    let products = fetch_products(&settings);
+    let mut products = fetch_products(&settings); // <-- mutable now
 
-    let listener = settings.get_tcp_listener()?;
-    let port = listener.local_addr().unwrap().port();
-    println!("Listening on http://0.0.0.0:{}", port);
+    if products.is_empty() {
+        products = vec![
+            Product { id: 1, name: "Sample Product 1".to_string(), price: 9.99 },
+            Product { id: 2, name: "Sample Product 2".to_string(), price: 19.99 },
+            Product { id: 3, name: "Sample Product 3".to_string(), price: 29.99 },
+            Product { id: 4, name: "Sample Product 4".to_string(), price: 39.99 },
+            Product { id: 5, name: "Sample Product 5".to_string(), price: 49.99 },
+        ];
+    }
 
-    
     let product_state = web::Data::new(AppState {
-        products: Mutex::new(products.to_vec()),
+        products: Mutex::new(products),
         settings: settings,
     });
+
+    // ... rest of your server code remains the same
+}
+
 
     let server = HttpServer::new(move || {
         
@@ -38,11 +47,10 @@ pub fn run(mut settings: Settings) -> Result<Server, std::io::Error> {
         .app_data(product_state.clone())
         .route("/health", web::get().to(health))
         .route("/health", web::head().to(health))
-        .route("/{product_id}", web::get().to(get_product))
-        .route("/", web::get().to(get_products))
-        .route("/", web::post().to(add_product))
-        .route("/", web::put().to(update_product))
-        .route("/{product_id}", web::delete().to(delete_product))
+        .route("/products", web::get().to(get_products))                // list first
+        .route("/products/{product_id}", web::get().to(get_product))    // then single product
+        .route("/products", web::post().to(add_product))
+        .route("/products/{product_id}", web::delete().to(delete_product))
         .route("/ai/health", web::get().to(ai_health))
         .route("/ai/health", web::head().to(ai_health))
         .route(
